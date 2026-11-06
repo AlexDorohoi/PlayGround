@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b1115" />
+  <title>FIRELINE — Drill Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Fireline home"><span class="brand-mark">F</span><span>FIRE<span class="brand-light">LINE</span></span></a>
+      <div class="top-divider"></div>
+      <div class="facility"><span class="eyebrow">FACILITY</span><strong>Northstar Research Annex</strong><span class="facility-tag">BLDG 04</span></div>
+      <div class="top-status"><span class="live-dot"></span><span id="phaseLabel">PRE-DRILL</span><span class="status-sep">/</span><span id="clockLabel">02:00</span></div>
+      <button id="soundBtn" class="icon-btn" title="Toggle sound" aria-label="Toggle sound">◖</button>
+      <button id="resetBtn" class="icon-btn" title="Reset drill" aria-label="Reset drill">↻</button>
+      <button id="startBtn" class="start-btn"><span class="start-icon">▶</span><span>START DRILL</span><span class="start-key">ENTER</span></button>
+    </header>
+
+    <section class="workspace">
+      <aside class="left-rail">
+        <section class="rail-section mission-card">
+          <div class="section-heading"><span>MISSION BRIEF</span><span class="tiny-dots">•••</span></div>
+          <div class="mission-title">Make ready.<br><em>Get everyone out.</em></div>
+          <p>Prepare the annex before the live evacuation test. Clear test fires, outfit wall mounts, and mark safe routes.</p>
+          <div class="brief-meta"><span>DRILL WINDOW</span><strong>02:00</strong></div>
+        </section>
+        <section class="rail-section objective-section">
+          <div class="section-heading"><span>READINESS</span><span id="readinessValue" class="readiness-value">38%</span></div>
+          <div class="progress-track"><i id="readinessBar" style="width:38%"></i></div>
+          <div class="objective-list">
+            <div class="objective" id="objFire"><span class="check-box"></span><span>Suppress test fires</span><b>02</b></div>
+            <div class="objective" id="objMount"><span class="check-box"></span><span>Equip wall mounts</span><b>02</b></div>
+            <div class="objective" id="objRoute"><span class="check-box"></span><span>Plan safe evacuations</span><b>02</b></div>
+          </div>
+        </section>
+        <section class="rail-section inventory-section">
+          <div class="section-heading"><span>ON YOUR PERSON</span><span class="keycap">Q</span></div>
+          <div id="extinguisherList" class="inventory-list"></div>
+          <div class="inventory-hint">HOLD <kbd>Q</kbd> + SCROLL TO SELECT</div>
+        </section>
+        <section class="rail-section tool-section">
+          <div class="section-heading"><span>FIELD TOOLS</span><span class="keycap">E</span></div>
+          <div id="toolList" class="tool-list"></div>
+          <div class="inventory-hint">HOLD <kbd>E</kbd> + SCROLL TO SELECT</div>
+        </section>
+        <div class="rail-footer"><span class="signal-icon">◉</span> ALL SYSTEMS NOMINAL <span class="build-id">OPS 04.27</span></div>
+      </aside>
+
+      <section class="play-area">
+        <div class="canvas-head"><div><span class="eyebrow">LIVE FACILITY MAP</span><span class="map-coord"> · SECTOR 04 / LEVEL 01</span></div><div class="map-actions"><span class="map-legend"><i class="legend-dot dot-safe"></i>SAFE</span><span class="map-legend"><i class="legend-dot dot-hazard"></i>BLAST ZONE</span><span class="map-legend"><i class="legend-dot dot-fire"></i>TEST FIRE</span><button id="zoomBtn" class="zoom-btn" title="Center view">⌖</button></div></div>
+        <div class="canvas-wrap">
+          <canvas id="gameCanvas" aria-label="Top-down facility map game"></canvas>
+          <div id="toast" class="toast"></div>
+          <div id="wheelOverlay" class="wheel-overlay"><canvas id="wheelCanvas" width="360" height="360"></canvas><div class="wheel-caption"><span id="wheelType">EXTINGUISHER</span><b id="wheelName">WATER</b><small>SCROLL OR ← → TO SELECT · RELEASE TO EQUIP</small></div></div>
+          <div id="drillOverlay" class="drill-overlay"><div class="drill-result"><div id="resultIcon" class="result-icon">✓</div><span class="eyebrow">SIMULATION COMPLETE</span><h2 id="resultTitle">DRILL PASSED</h2><p id="resultCopy">Every evacuee reached a safe exit.</p><div class="result-stats"><div><b id="evacStat">0 / 2</b><span>EVACUATED</span></div><div><b id="scoreStat">100%</b><span>SAFETY SCORE</span></div><div><b id="timeStat">00:00</b><span>TIME ELAPSED</span></div></div><button id="playAgain">RUN IT AGAIN <span>↻</span></button></div></div>
+          <div class="map-hint"><span class="hint-key">W A S D</span> MOVE <span class="hint-sep">·</span><span class="hint-key">MOUSE</span> AIM <span class="hint-sep">·</span><span class="hint-key">CLICK</span> SPRAY / DRAW</div>
+        </div>
+        <footer class="canvas-footer"><div class="marshal-id"><div class="marshal-avatar">M</div><div><span class="eyebrow">FIELD MARSHAL</span><strong>R. MORGAN <i>·</i> UNIT 01</strong></div></div><div class="selected-loadout"><span class="eyebrow">EQUIPPED</span><span id="equippedLabel" class="equip-pill"><i></i> WATER / CLASS A</span></div><div id="toolHint" class="context-hint"><span class="mouse-icon">⌁</span> CLICK + DRAG TO PAINT EVACUATION ROUTE</div><div class="canvas-footer-right"><span class="net-dot"></span> LOCAL SIM <span class="footer-sep">|</span> v1.4.0</div></footer>
+      </section>
+      <aside class="right-rail">
+        <section class="right-card status-card"><div class="section-heading"><span>INCIDENT STATUS</span><span class="status-chip" id="incidentChip">STANDBY</span></div><div class="incident-main"><span class="incident-number" id="incidentNumber">02</span><div><strong>Hazards detected</strong><span>2 active zones · 1 live fire</span></div></div><div class="incident-stats"><div><span>OCCUPANTS</span><strong id="occupantCount">02</strong></div><div><span>EXITS</span><strong>02</strong></div><div><span>ALARM</span><strong id="alarmState">OFF</strong></div></div></section>
+        <section class="right-card hazard-card"><div class="section-heading"><span>HAZARD REGISTER</span><span class="hazard-count">03 ITEMS</span></div><div id="hazardList" class="hazard-list"></div></section>
+        <section class="right-card route-card"><div class="section-heading"><span>EVACUATION ROUTES</span><span id="routeCount" class="route-count">0 / 2</span></div><div id="routeList" class="route-list"><div class="empty-routes"><span>↗</span><p>No routes marked yet.<br><b>Choose Route Paint</b> and draw from an occupant to an exit.</p></div></div><div class="route-warning" id="routeWarning"><span>!</span><div><b>UNSAFE ROUTE</b><small>PATH CROSSES AN EXPLOSION ZONE</small></div></div></section>
+        <section class="right-card intel-card"><div class="intel-icon">✳</div><div><span class="eyebrow">FIELD NOTE</span><p id="fieldNote">Water is effective on ordinary combustibles. Never use it on energized electrical equipment or cooking oil.</p></div></section>
+        <div class="right-rail-footer"><span>EMERGENCY SERVICES</span><strong>911 <i>·</i> EXT. 04</strong></div>
+      </aside>
+    </section>
+    <div class="mobile-controls"><span>WASD MOVE</span><span>Q / E SELECT</span><span>CLICK ACTION</span></div>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
