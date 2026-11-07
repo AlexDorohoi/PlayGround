@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#101b22" />
+  <title>Ember Shift — Rescue Crew</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101b22'/%3E%3Cpath d='M16 3 19 12 28 16 19 19 16 29 12 19 3 16 12 12Z' fill='%23ff7954'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <main class="game-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">✦</span><div><strong>EMBER SHIFT</strong><small>RESCUE CREW · FIELD OPS</small></div></div>
+      <div class="mission"><span class="live-dot"></span><span id="level-name">TRAINING WING</span><span class="mission-sep">/</span><span id="objective">SHUT THE VALVE · EVAC 2</span></div>
+      <button id="pause-button" class="icon-button" aria-label="Pause game">Ⅱ</button>
+    </header>
+    <section class="playfield" aria-label="Game area">
+      <canvas id="game" width="960" height="540" aria-label="Top-down rescue game"></canvas>
+      <div class="canvas-vignette"></div>
+      <div class="level-toast" id="toast">FIELD 01 — TRAINING WING</div>
+      <div class="heat-card"><div class="heat-label"><span>THERMAL LOAD</span><span id="heat-value">18%</span></div><div class="heat-track"><i id="heat-bar"></i></div></div>
+      <div class="tank-chip"><span id="tank-icon">◉</span><span><b id="tank-name">WATER</b><small>ACTIVE TANK</small></span><button id="tank-button" aria-label="Select extinguisher">⌄</button></div>
+      <div id="tank-wheel" class="tank-wheel" aria-label="Extinguisher selector">
+        <button data-tank="0"><i class="tank-dot water"></i><span>WATER</span><small>CLASS A</small></button>
+        <button data-tank="1"><i class="tank-dot co2"></i><span>CO₂</span><small>CLASS C</small></button>
+        <button data-tank="2"><i class="tank-dot foam"></i><span>FOAM</span><small>CLASS B</small></button>
+        <button data-tank="3"><i class="tank-dot cryo"></i><span>CRYO</span><small>EXTREME</small></button>
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <div class="screen-cover" id="screen-cover"><div class="cover-card"><div class="cover-icon">✦</div><p class="eyebrow">A LITTLE LIGHT IN THE DARK</p><h1>EMBER<br><em>SHIFT</em></h1><p class="cover-copy">The building is still breathing. Get everyone out.</p><button id="start-button" class="primary-button">START RESCUE <span>↗</span></button><div class="cover-foot">MOVE · AIM & SPRAY · RESCUE · ESCAPE</div></div></div>
+      <div class="end-screen" id="end-screen"><div class="cover-card"><p class="eyebrow" id="end-eyebrow">MISSION COMPLETE</p><h2 id="end-title">ALL SAFE.</h2><p class="cover-copy" id="end-copy">Every last soul made it out.</p><button id="next-button" class="primary-button">NEXT SHIFT <span>↗</span></button></div></div>
+    </section>
+    <footer class="controls">
+      <div class="control-hint left-hint"><span class="keycap">◉</span><span>MOVE</span></div>
+      <div class="joystick-note">DRAG ANYWHERE TO MOVE</div>
+      <button id="grab-button" class="action-button"><span class="action-icon">↗</span><span><b>GRAB / THROW</b><small id="grab-hint">RESCUE A CIVILIAN</small></span></button>
+      <div class="control-hint right-hint"><span class="keycap">◉</span><span>AIM + SPRAY</span></div>
+      <div class="joystick-note right-note">HOLD TO SPRAY</div>
+    </footer>
+    <div class="bottomline"><span>FIELD NOTES <b>01—03</b></span><span>STAY LOW. STAY KIND.</span><span id="rescued-counter">EVACUATED 0 / 2</span></div>
+  </main>
+  <script type="module" src="src/game.js"></script>
+</body>
+</html>
