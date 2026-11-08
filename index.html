@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#101619">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2311191b'/%3E%3Cpath d='M7 25h18L22 11h-4V6h-5v5h-3z' fill='%23e3b83c'/%3E%3Cpath d='M10 12h12l2 4H8z' fill='%23cf4438'/%3E%3C/svg%3E">
+<title>Mr. Rescue: Extinguish Protocol</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
+:root{color-scheme:dark;--ink:#11191b;--panel:#172225;--muted:#839393;--cream:#f3e8c9;--orange:#ff7447;--lime:#d8f16a;}
+*{box-sizing:border-box}html,body{height:100%;margin:0;background:#0c1214;color:var(--cream);overflow:hidden;font-family:'Barlow Condensed',sans-serif;touch-action:none}
+body{display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#202c2e 0%,#101719 55%,#090e10 100%)}
+#game-shell{position:relative;width:min(100vw,177.78vh);height:min(100vh,56.25vw);aspect-ratio:16/9;background:#171d1c;overflow:hidden;box-shadow:0 24px 100px #000b;border:1px solid #53605a}
+canvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;display:block}
+#vignette{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 70px #080c0cad,inset 0 0 0 5px #11191b}
+#touch-hint{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);font:10px 'DM Mono',monospace;letter-spacing:1.6px;color:#c8d1b188;text-transform:uppercase;pointer-events:none}
+@media (orientation:portrait){#game-shell{width:100vw;height:100vh;aspect-ratio:auto;border:0}canvas{object-fit:contain;background:#111719}}
+</style>
+</head>
+<body>
+<main id="game-shell" aria-label="Mr. Rescue Extinguish Protocol game">
+<canvas id="game" width="960" height="540" aria-label="Firefighter rescue game"></canvas>
+<div id="vignette"></div><div id="touch-hint">WASD / ARROWS · E RESCUE · Q SWITCH · F FULLSCREEN</div>
+</main>
+<script>
+(() => {
+'use strict';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d',{alpha:false}),W=960,H=540;
+ctx.imageSmoothingEnabled=false;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rand=(a,b)=>a+Math.random()*(b-a),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const weapons=[
+ {name:'WATER',short:'H₂O',color:'#69d8ff',enemy:'EMBER',icon:'✦',ammo:52},
+ {name:'FOAM',short:'AFFF',color:'#e4f2dc',enemy:'OIL',icon:'◈',ammo:36},
+ {name:'CRYO',short:'N₂',color:'#a7f2eb',enemy:'FROSTFIRE',icon:'❄',ammo:30},
+ {name:'CO₂',short:'CO₂',color:'#d2d4ff',enemy:'PHANTOM',icon:'◌',ammo:28}
+];
+const world={w:2160,h:720,rooms:3};
+let state='title',last=0,elapsed=0,score=0,saved=0,heat=0,weapon=0,roomIndex=0,fireTimer=0,screenShake=0,damageFlash=0,notice='',noticeTime=0;
+let player,civilians,enemies,fires,pickups,shots,particles,doors,props,camera={x:0,y:0};
+const keys={},touches=new Map(),moveStick={x:0,y:0},aimStick={x:0,y:0};
+let mouse={x:480,y:270,down:false},lastShot=0,aim={x:1,y:0},interactPulse=0;
+const floorY=96,floorH=560,roomW=720;
+function makeWorld(){
+ player={x:95,y:365,r:13,speed:178,carry:null,face:0,invuln:0};
+ civilians=[
+  {x:270,y:230,room:0,rescued:false,carried:false,panic:0},
+  {x:550,y:485,room:0,rescued:false,carried:false,panic:0},
+  {x:835,y:260,room:1,rescued:false,carried:false,panic:0},
+  {x:1130,y:470,room:1,rescued:false,carried:false,panic:0},
+  {x:1555,y:245,room:2,rescued:false,carried:false,panic:0},
+  {x:1900,y:500,room:2,rescued:false,carried:false,panic:0}
+ ];
+ enemies=[
+  enemy(430,340,'EMBER',0),enemy(900,400,'OIL',1),enemy(1120,220,'FROSTFIRE',1),enemy(1550,415,'PHANTOM',2),enemy(1870,255,'EMBER',2)
+ ];
+ fires=[
+  fire(350,205,'EMBER',0,1.3),fire(475,455,'OIL',0,1.2),fire(690,340,'FROSTFIRE',0,1.5,true),
+  fire(900,205,'OIL',1,1.3),fire(1040,480,'PHANTOM',1,1.1),fire(1415,340,'EMBER',1,1.45,true),
+  fire(1645,210,'FROSTFIRE',2,1.25),fire(1780,470,'PHANTOM',2,1.4),fire(2050,340,'OIL',2,1.1)
+ ];
+ pickups=[{x:185,y:520,type:'coolant',used:false},{x:610,y:195,type:'ammo',used:false,weapon:0},{x:800,y:520,type:'coolant',used:false},{x:1250,y:210,type:'ammo',used:false,weapon:1},{x:1470,y:510,type:'coolant',used:false},{x:1960,y:185,type:'ammo',used:false,weapon:2}];
+ shots=[];particles=[];score=0;saved=0;heat=0;weapon=0;elapsed=0;fireTimer=0;roomIndex=0;
+ doors=[{x:720,y:370,open:true},{x:1440,y:370,open:true}];
+ props=[];
+ for(let r=0;r<3;r++){
+  const ox=r*roomW;
+  props.push({x:ox+180,y:330,w:76,h:48,type:'sofa',seed:r+4},{x:ox+560,y:185,w:64,h:56,type:'table',seed:r+7},{x:ox+210,y:520,w:68,h:42,type:'cabinet',seed:r+10},{x:ox+495,y:365,w:50,h:88,type:'plant',seed:r+12});
+ }
+}
+function enemy(x,y,type,room){return{x,y,type,room,hp:3,r:14,phase:rand(0,7),vx:0,vy:0,stun:0,flash:0}}
+function fire(x,y,type,room,intensity=1,block=false){return{x,y,type,room,intensity,r:block?27:19,block,health:block?4:3,spread:rand(5,12),phase:rand(0,8),dead:false}}
+function setNotice(text){notice=text;noticeTime=2.2}
+function startGame(){makeWorld();state='playing';setNotice('GET EVERYONE OUT. THE BUILDING IS GOING UP.');}
+function resize(){const s=Math.min(innerWidth/W,innerHeight/H);canvas.style.width=`${W*s}px`;canvas.style.height=`${H*s}px`;}
+addEventListener('resize',resize);resize();
+function pointerPos(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);const p=pointerPos(e);if(state==='title'||state==='dead'||state==='won'){if(state!=='title'||p.y>240)startGame();return;}if(state==='paused'){state='playing';return;}
+ if(e.pointerType==='mouse'){mouse=Object.assign(mouse,p);mouse.down=true;return;}
+ if(p.x>875&&p.y<86){state='paused';return;}if(p.y>H-76&&p.x>=748&&p.x<866){cycleWeapon();return;}if(p.y>H-76&&p.x>=530&&p.x<710){interact();return;}if(p.y>H-76&&p.x>=870){toggleFullscreen();return;}
+ touches.set(e.pointerId,{start:p,last:p,side:p.x<W*.5?'move':'aim'});updateSticks();});
+canvas.addEventListener('pointermove',e=>{if(touches.has(e.pointerId)){touches.get(e.pointerId).last=pointerPos(e);updateSticks();}else if(e.pointerType==='mouse')mouse=Object.assign(mouse,pointerPos(e));});
+canvas.addEventListener('pointerup',e=>{if(touches.has(e.pointerId)){touches.delete(e.pointerId);updateSticks();}mouse.down=false;});
+canvas.addEventListener('pointercancel',e=>{touches.delete(e.pointerId);updateSticks()});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+function updateSticks(){moveStick.x=moveStick.y=aimStick.x=aimStick.y=0;for(const t of touches.values()){const dx=t.last.x-t.start.x,dy=t.last.y-t.start.y,l=Math.hypot(dx,dy)||1,m=Math.min(1,l/48),x=dx/l*m,y=dy/l*m;if(t.side==='move'){moveStick.x=x;moveStick.y=y;}else{aimStick.x=x;aimStick.y=y;}}}
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(e.key.toLowerCase()))e.preventDefault();if(e.repeat)return;
+ if(e.key.toLowerCase()==='enter'&&(state==='title'||state==='dead'||state==='won'))startGame();
+ if(e.key.toLowerCase()==='q'&&state==='playing')cycleWeapon();
+ if(e.key.toLowerCase()==='e'&&state==='playing')interact();
+ if(e.key.toLowerCase()==='f')toggleFullscreen();
+ if(e.key.toLowerCase()==='escape'&&state==='playing')state='paused';else if(e.key.toLowerCase()==='escape'&&state==='paused')state='playing';
+});addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')mouse.down=true;});
+function toggleFullscreen(){if(!document.fullscreenElement)document.getElementById('game-shell').requestFullscreen?.();else document.exitFullscreen?.();}
+function cycleWeapon(){weapon=(weapon+1)%weapons.length;setNotice(`${weapons[weapon].name} SELECTED`)}
+function interact(){if(player.carry){const ex=nearestExit(player.x,player.y);if(ex){rescueCivilian();return;}}
+ let nearest=null,nd=48;for(const c of civilians){if(c.rescued||c.carried)continue;const d=dist(player,c);if(d<nd){nearest=c;nd=d;}}
+ if(nearest){nearest.carried=true;player.carry=nearest;setNotice('CIVILIAN SECURED — MOVE TO A WINDOW EXIT');return;}
+ const pickup=pickups.find(p=>!p.used&&dist(player,p)<38);if(pickup){collect(pickup);return;}
+ const door=doors.find(d=>Math.abs(player.x-d.x)<44&&Math.abs(player.y-d.y)<60);if(door){if(door.open&&Math.abs(player.x-door.x)<18&&player.y>=322&&player.y<=404){setNotice('STEP CLEAR BEFORE SEALING THE DOOR');return;}door.open=!door.open;setNotice(door.open?'FIRE DOOR OPEN':'FIRE DOOR SEALED');return;}
+ setNotice('NO INTERACTION IN REACH');}
+function nearestExit(x,y){return [{x:65,y:112,w:72,h:48},{x:720,y:112,w:72,h:48},{x:1440,y:112,w:72,h:48},{x:2090,y:112,w:72,h:48}].find(e=>Math.abs(x-e.x)<e.w/2&&Math.abs(y-e.y)<e.h/2)}
+function rescueCivilian(){const c=player.carry;if(!c)return;c.rescued=true;c.carried=false;c.x=player.x;c.y=player.y;player.carry=null;saved++;score+=500+Math.max(0,Math.floor((100-heat)*3));setNotice('CIVILIAN EVACUATED  + SCORE');for(let i=0;i<18;i++)particles.push({x:player.x,y:player.y,vx:rand(-60,60),vy:rand(-90,30),life:rand(.35,.8),color:'#d8f16a',size:3});}
+function collect(p){p.used=true;if(p.type==='coolant'){heat=Math.max(0,heat-38);setNotice('COOLANT INJECTED  −38 HEAT');}else{weapons[p.weapon].ammo=Math.min(weapons[p.weapon].ammo+18,60);setNotice(`${weapons[p.weapon].name} CANISTER +18`);}}
+function fireInput(dt){let firing=false,dir=aim;
+ if(Math.hypot(aimStick.x,aimStick.y)>.12){dir={x:aimStick.x,y:aimStick.y};firing=true;}
+ else if(mouse.down){const wx=mouse.x+camera.x,wy=mouse.y+camera.y,dx=wx-player.x,dy=wy-player.y,l=Math.hypot(dx,dy)||1;dir={x:dx/l,y:dy/l};firing=true;}
+ else if(keys[' ']||keys['j'])firing=true;
+ let ax=(keys['arrowright']?1:0)-(keys['arrowleft']?1:0),ay=(keys['arrowdown']?1:0)-(keys['arrowup']?1:0);if(ax||ay){const l=Math.hypot(ax,ay);dir={x:ax/l,y:ay/l};aim=dir;firing=true;}
+ if(firing){aim=dir;if(elapsed-lastShot>.16){shoot(dir);lastShot=elapsed;}}
+}
+function shoot(dir){const w=weapons[weapon];if(w.ammo<=0){setNotice('EMPTY CANISTER — FIND A SUPPLY');lastShot=elapsed+.3;return;}w.ammo--;shots.push({x:player.x+dir.x*20,y:player.y+dir.y*20,vx:dir.x*390,vy:dir.y*390,life:.55,type:weapon,color:w.color});for(let i=0;i<3;i++)particles.push({x:player.x+dir.x*19,y:player.y+dir.y*19,vx:dir.x*rand(20,90)+rand(-25,25),vy:dir.y*rand(20,90)+rand(-25,25),life:.16,color:w.color,size:3});}
+function blockedAt(x,y){
+ // The sector dividers are solid except at the fire-door opening, and a sealed door blocks it too.
+ for(const boundary of [720,1440])if(Math.abs(x-boundary)<18){const door=doors.find(d=>d.x===boundary);if(y<322||y>404||!door?.open)return true;}
+ // Furniture and the special fire lines are real obstacles, not just decoration.
+ for(const p of props)if(Math.abs(x-p.x)<p.w/2+player.r-3&&Math.abs(y-p.y)<p.h/2+player.r-3)return true;
+ for(const f of fires)if(!f.dead&&f.block&&Math.hypot(x-f.x,y-f.y)<f.r+player.r-3)return true;
+ return false;
+}
+function clearBlock(f){return f.block&&!f.dead&&Math.hypot(f.x-player.x,f.y-player.y)<f.r+player.r+4;}
+function update(dt){if(state!=='playing')return;elapsed+=dt;interactPulse=Math.max(0,interactPulse-dt);if(noticeTime>0)noticeTime-=dt;damageFlash=Math.max(0,damageFlash-dt*2);screenShake=Math.max(0,screenShake-dt*20);
+ let mx=(keys['d']||keys['w']||keys['s']||keys['a'])?((keys['d']?1:0)-(keys['a']?1:0)):moveStick.x;
+ let my=(keys['s']||keys['w']||keys['a']||keys['d'])?((keys['s']?1:0)-(keys['w']?1:0)):moveStick.y;
+ const ml=Math.hypot(mx,my);if(ml>1){mx/=ml;my/=ml;}const speed=player.speed*(player.carry?.78:1);
+ const nextX=clamp(player.x+mx*speed*dt,30,world.w-30),nextY=clamp(player.y+my*speed*dt,floorY+25,floorY+floorH-24);
+ if(!blockedAt(nextX,player.y))player.x=nextX;
+ if(!blockedAt(player.x,nextY))player.y=nextY;
+ if(mx||my)player.face=Math.atan2(my,mx);
+ fireInput(dt);updateShots(dt);updateEnemies(dt);updateFires(dt);updatePickups();updateParticles(dt);
+ let nearFire=0;for(const f of fires){if(f.dead)continue;const d=Math.hypot(player.x-f.x,player.y-f.y);if(d<95)nearFire=Math.max(nearFire,(1-d/115)*f.intensity);}
+ heat=clamp(heat+nearFire*dt*6.8-(nearFire===0?dt*4.2:dt*.5),0,100);if(heat>=100){state='dead';setNotice('HEAT CRITICAL');return;}
+ for(const e of enemies){if(dist(e,player)<25&&player.invuln<=0){heat=clamp(heat+12,0,100);player.invuln=.7;damageFlash=.45;screenShake=6;setNotice('CONTACT — GET CLEAR');}}
+ player.invuln=Math.max(0,player.invuln-dt);
+ for(const c of civilians){if(c.rescued||c.carried)continue;let danger=0;for(const f of fires)if(!f.dead&&dist(c,f)<70)danger+=dt*.15;if(danger)c.panic=clamp(c.panic+danger,0,1);}
+ const room=Math.floor(player.x/roomW);if(room!==roomIndex){roomIndex=room;}
+ camera.x=clamp(player.x-W/2,0,world.w-W);camera.y=clamp(player.y-H/2,0,world.h-H);
+ const evac=nearestExit(player.x,player.y);if(player.carry&&evac)rescueCivilian();
+ if(player.x>2075&&player.y<165){if(saved>=4){state='won';score+=1200;}else setNotice('NEED 4 CIVILIANS — '+saved+' EVACUATED');}
+}
+function updateShots(dt){for(let i=shots.length-1;i>=0;i--){const s=shots[i];s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;let hit=false;
+ for(const e of enemies){if(e.hp<=0||Math.hypot(s.x-e.x,s.y-e.y)>e.r+5)continue;if(s.type===enemyWeapon(e.type)){e.hp-=1;e.stun=.38;e.flash=.22;score+=80;for(let j=0;j<7;j++)particles.push({x:e.x,y:e.y,vx:rand(-70,70),vy:rand(-70,70),life:rand(.2,.45),color:weapons[s.type].color,size:3});if(e.hp<=0){score+=240;setNotice(`${e.type} NEUTRALIZED`);for(let j=0;j<15;j++)particles.push({x:e.x,y:e.y,vx:rand(-100,100),vy:rand(-100,100),life:rand(.3,.7),color:weapons[s.type].color,size:3});}}else{e.stun=.12;score=Math.max(0,score-5);}hit=true;break;}
+ if(!hit)for(const f of fires){if(f.dead||Math.hypot(s.x-f.x,s.y-f.y)>f.r+5)continue;if(s.type===fireWeapon(f.type)){f.health--;f.intensity=Math.max(.15,f.intensity-.24);if(f.health<=0){f.dead=true;score+=100;setNotice('FIRE LINE CLEARED');for(let j=0;j<16;j++)particles.push({x:f.x,y:f.y,vx:rand(-70,70),vy:rand(-70,70),life:rand(.3,.8),color:weapons[s.type].color,size:3});}}else{f.intensity=clamp(f.intensity+.18,.2,2);if(f.block)f.health=Math.min(5,f.health+1);}hit=true;break;}
+ if(hit||s.life<=0||s.x<0||s.x>world.w||s.y<floorY||s.y>floorY+floorH)shots.splice(i,1);
+ }}
+function enemyWeapon(type){return type==='EMBER'?0:type==='OIL'?1:type==='FROSTFIRE'?2:3}
+function fireWeapon(type){return type==='EMBER'?0:type==='OIL'?1:type==='FROSTFIRE'?2:3}
+function updateEnemies(dt){for(const e of enemies){if(e.hp<=0)continue;e.phase+=dt*(e.stun?0:1);e.stun=Math.max(0,e.stun-dt);e.flash=Math.max(0,e.flash-dt);const d=dist(e,player),chase=d<240;let tx=chase?player.x:e.x+Math.cos(e.phase*.8)*24,ty=chase?player.y:e.y+Math.sin(e.phase*.65)*24;
+ let dx=tx-e.x,dy=ty-e.y,l=Math.hypot(dx,dy)||1,s=chase?50:20;if(!e.stun){e.x+=dx/l*s*dt;e.y+=dy/l*s*dt;}e.x=clamp(e.x,e.room*roomW+34,(e.room+1)*roomW-34);e.y=clamp(e.y,floorY+30,floorY+floorH-30);
+ for(const p of props){if(Math.abs(e.x-p.x)<p.w/2+12&&Math.abs(e.y-p.y)<p.h/2+12){e.x-=dx/l*s*dt;e.y-=dy/l*s*dt;}}
+ }}
+function updateFires(dt){fireTimer+=dt;for(const f of fires){if(f.dead)continue;f.phase+=dt*4;f.intensity=clamp(f.intensity+dt*.006,0.2,1.8);if(fireTimer>f.spread&&Math.random()<.018&&fires.filter(x=>!x.dead).length<14){f.spread=rand(7,14);const nx=f.x+rand(-100,100),ny=f.y+rand(-90,90);if(nx>f.room*roomW+55&&nx<(f.room+1)*roomW-45&&ny>floorY+40&&ny<floorY+floorH-35&&!fires.some(x=>!x.dead&&Math.hypot(x.x-nx,x.y-ny)<80))fires.push(fire(nx,ny,f.type,f.room,.8,false));}}
+ }
+function updatePickups(){for(const p of pickups){if(!p.used&&dist(player,p)<22)collect(p);}}
+function updateParticles(dt){for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.96;p.vy*=.96;p.life-=dt;if(p.life<=0)particles.splice(i,1);}}
+function rect(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));}
+function text(s,x,y,size=14,color='#f3e8c9',font="'DM Mono', monospace",align='left'){ctx.fillStyle=color;ctx.font=`${size}px ${font}`;ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillText(s,x,y);}
+function rounded(x,y,w,h,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
+function worldDraw(){ctx.save();ctx.translate(-Math.floor(camera.x),-Math.floor(camera.y));
+ // building floor and subtly gridded tiles
+ rect(0,0,world.w,world.h,'#101819');rect(0,floorY,world.w,floorH,'#454945');
+ for(let x=0;x<world.w;x+=48){rect(x,floorY,1,floorH,'#52564e');rect(x+1,floorY,1,floorH,'#3b403b');}
+ for(let y=floorY;y<floorY+floorH;y+=48){rect(0,y,world.w,1,'#59594e');rect(0,y+1,world.w,1,'#3e433e');}
+ for(let x=0;x<world.w;x+=96)for(let y=floorY;y<floorY+floorH;y+=96){if((x/96+y/96)%2===0)rect(x+2,y+2,43,43,'#ffffff04');}
+ // perimeter walls, with stylized brick pattern
+ wall(0,floorY-27,world.w,28);wall(0,floorY+floorH,world.w,28);
+ for(let x=0;x<world.w;x+=roomW){wall(x-26,floorY,26,floorH);}
+ wall(world.w,floorY,28,floorH);
+ for(const boundary of [720,1440]){
+  wall(boundary-13,floorY,26,220);wall(boundary-13,410,26,210);
+  rect(boundary-20,326,40,90,'#242b28');rect(boundary-14,333,28,76,'#858267');
+  const door=doors.find(d=>d.x===boundary);
+  if(door?.open){rect(boundary-10,339,20,64,'#1b2524');rect(boundary+5,340,5,62,'#796f52');rect(boundary+10,345,2,52,'#b79b64');}
+  else{rect(boundary-10,339,20,64,'#62513b');rect(boundary-7,342,14,58,'#997950');rect(boundary-4,346,8,50,'#514c3c');rect(boundary+5,368,3,3,'#e5cb83');}
+  rect(boundary-21,320,42,7,'#c7a86f');rect(boundary-21,411,42,7,'#c7a86f');
+ }
+ // exit windows and evacuation markers
+ for(const ex of [65,720,1440,2090]){rect(ex-34,floorY-29,68,31,'#151c1c');rect(ex-28,floorY-23,56,19,'#9bdbd1');rect(ex-25,floorY-20,50,13,'#c7f5df');rect(ex-2,floorY-23,4,19,'#526765');rect(ex-32,floorY+3,64,5,'#efcd71');}
+ // room identity stencils
+ for(let r=0;r<3;r++){const ox=r*roomW;text(`SECTOR 0${r+1}`,ox+30,floorY+34,11,'#e3d2a077');text(['APARTMENTS','SERVICE WING','NORTH TOWER'][r],ox+30,floorY+52,9,'#c5c7b355');}
+ drawProps();drawPickups();drawFires();drawCivilians();drawEnemies();drawShots();drawPlayer();drawParticles();
+ ctx.restore();}
+function wall(x,y,w,h){rect(x,y,w,h,'#8a8064');rect(x,y,w,h>10?5:w,'#c6ac76');rect(x,y+h-5,w,5,'#5e594a');for(let xx=x+5;xx<x+w;xx+=25){rect(xx,y+9,1,Math.max(0,h-18),'#645f50');}}
+function drawProps(){for(const p of props){const x=p.x,y=p.y;ctx.save();ctx.globalAlpha=.35;rect(x-p.w/2+6,y+p.h/2-2,p.w,p.h/3,'#101514');ctx.restore();
+ if(p.type==='sofa'){rounded(x-p.w/2,y-p.h/2,p.w,p.h,7,'#654c3e');rounded(x-p.w/2+6,y-p.h/2+6,p.w-12,p.h-13,5,'#987456');rect(x-2,y-p.h/2+7,4,p.h-14,'#5b4439');rect(x-p.w/2+5,y+p.h/2-4,10,5,'#392f29');rect(x+p.w/2-15,y+p.h/2-4,10,5,'#392f29');}
+ else if(p.type==='table'){rect(x-p.w/2,y-p.h/2+9,p.w,p.h-15,'#866a45');rect(x-p.w/2+4,y-p.h/2+13,p.w-8,p.h-23,'#aa8954');rect(x-p.w/2+4,y+p.h/2-7,6,9,'#56462f');rect(x+p.w/2-10,y+p.h/2-7,6,9,'#56462f');rect(x-9,y-7,18,14,'#626955');}
+ else if(p.type==='cabinet'){rect(x-p.w/2,y-p.h/2,p.w,p.h,'#5a5345');rect(x-p.w/2+4,y-p.h/2+4,p.w-8,p.h-8,'#77715c');rect(x-2,y-p.h/2+7,4,p.h-14,'#48483f');rect(x-14,y,4,4,'#dcc67e');}
+ else {rect(x-4,y+12,8,15,'#584838');rect(x-13,y+20,26,4,'#493b30');for(let i=0;i<5;i++){const a=i*1.25+p.seed;ctx.fillStyle=['#5b7b57','#77945e','#3f6753'][i%3];ctx.beginPath();ctx.ellipse(x+Math.cos(a)*12,y+Math.sin(a)*10,7,10,a,0,Math.PI*2);ctx.fill();}}
+ }}
+function drawFires(){for(const f of fires){if(f.dead)continue;const p=f.phase,scale=1+Math.sin(p)*.12;ctx.save();ctx.translate(f.x,f.y);if(f.block){ctx.globalAlpha=.23;ctx.fillStyle=weapons[fireWeapon(f.type)].color;ctx.beginPath();ctx.arc(0,0,f.r+12,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}
+ ctx.fillStyle='#ff5a2c';ctx.beginPath();ctx.ellipse(0,6,f.r*1.1,f.r*.78,0,0,Math.PI*2);ctx.fill();
+ for(let i=0;i<4;i++){const a=i*Math.PI/2+p*.55;ctx.fillStyle=['#ffb642','#ffe98b','#ee4d2a','#ff8539'][i];ctx.beginPath();ctx.ellipse(Math.cos(a)*f.r*.4,Math.sin(a)*f.r*.35-7,6*scale,rand(10,17)*scale,a,0,Math.PI*2);ctx.fill();}
+ ctx.fillStyle='#fff0a5';ctx.fillRect(-3,4,6,8);ctx.restore();
+ if(f.block){rect(f.x-20,f.y+f.r+10,40,4,'#24201b');rect(f.x-20,f.y+f.r+10,40*(f.health/4),4,weapons[fireWeapon(f.type)].color);}}
+}
+function drawCivilians(){for(const c of civilians){if(c.rescued||c.carried)continue;const panic=c.panic;ctx.save();ctx.translate(c.x,c.y);ctx.fillStyle='#1b2220';ctx.beginPath();ctx.ellipse(0,9,10,5,0,0,7);ctx.fill();rect(-6,-8,12,17,'#5d9c8b');rect(-5,-15,10,9,'#dfad75');rect(-7,-17,14,4,'#503a31');rect(-3,-2,6,4,'#e7d2aa');rect(-7,8,4,5,'#282d2b');rect(3,8,4,5,'#282d2b');if(panic>.2){text('!',9,-15,12,'#ffb753');}ctx.restore();}}
+function drawEnemies(){for(const e of enemies){if(e.hp<=0)continue;ctx.save();ctx.translate(e.x,e.y);ctx.fillStyle=e.flash>0?'#fff':enemyColor(e.type);ctx.beginPath();ctx.arc(0,0,13+Math.sin(e.phase*4)*1.5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#211c21';ctx.beginPath();ctx.arc(-4,-2,2,0,Math.PI*2);ctx.arc(4,-2,2,0,Math.PI*2);ctx.fill();rect(-5,5,10,3,'#ffc075');ctx.strokeStyle=enemyColor(e.type);ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,17,0,Math.PI*2);ctx.stroke();
+ for(let i=0;i<3;i++)rect(-8+i*6,20,4,3,i<e.hp?'#f7d96c':'#303333');ctx.restore();}}
+function enemyColor(t){return t==='EMBER'?'#d85e35':t==='OIL'?'#ee8e39':t==='FROSTFIRE'?'#73bfd2':'#b0a7e8'}
+function drawPickups(){for(const p of pickups){if(p.used)continue;const bob=Math.sin(elapsed*3+p.x)*2;ctx.save();ctx.translate(p.x,p.y+bob);ctx.fillStyle='#111919aa';ctx.beginPath();ctx.arc(0,0,16,0,7);ctx.fill();ctx.strokeStyle=p.type==='coolant'?'#b7f4a1':'#e9d277';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,13,0,7);ctx.stroke();if(p.type==='coolant'){rect(-5,-7,10,14,'#8fe6ae');rect(-3,-10,6,4,'#d7f5ce');rect(-1,-4,2,8,'#f1ffe2');}else{rect(-7,-8,14,16,'#d1b865');rect(-4,-4,8,8,weapons[p.weapon].color);rect(-4,-11,8,3,'#f2df9e');}ctx.restore();}}
+function drawShots(){for(const s of shots){ctx.fillStyle=s.color;ctx.globalAlpha=.75;ctx.beginPath();ctx.ellipse(s.x,s.y,6,3,Math.atan2(s.vy,s.vx),0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}}
+function drawPlayer(){ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.face);ctx.fillStyle='#141b19aa';ctx.beginPath();ctx.ellipse(0,11,14,8,0,0,7);ctx.fill();if(player.invuln>0&&Math.floor(elapsed*20)%2===0)ctx.globalAlpha=.45;
+ // helmet, head and rescue-yellow turnout coat
+ rect(-11,-9,21,21,'#d8a82d');rect(-9,-7,17,15,'#edc746');rect(-8,-11,16,8,'#d9aa36');rect(-9,-15,18,8,'#b53830');rect(-6,-19,12,5,'#e04b39');rect(-11,3,22,3,'#fbebad');rect(-7,9,5,5,'#303a35');rect(3,9,5,5,'#303a35');rect(6,-4,8,4,'#ffe986');
+ if(player.carry){rect(-7,-26,14,9,'#629c8a');rect(-5,-31,10,6,'#dfa879');rect(-2,-34,5,4,'#5f4438');}ctx.restore();}
+function drawParticles(){for(const p of particles){ctx.globalAlpha=clamp(p.life*2,0,1);rect(p.x,p.y,p.size,p.size,p.color);}ctx.globalAlpha=1;}
+function drawHUD(){
+ // top command strip
+ rect(0,0,W,76,'#101718eF');rect(0,75,W,2,'#b49a5e');rect(18,15,4,43,'#e94e3d');text('MR. RESCUE',34,23,17,'#f3e8c9',"'Barlow Condensed',sans-serif");text('EXTINGUISH PROTOCOL',34,46,10,'#9baba2');
+ const heatX=245,heatW=210;text('THERMAL LOAD',heatX,20,10,'#b8c2b4');rounded(heatX,33,heatW,12,2,'#2c3634');rounded(heatX,33,heatW*(heat/100),12,2,heat>70?'#ed5445':heat>42?'#f0a34a':'#d8f16a');text(`${Math.ceil(heat)}%`,heatX+heatW+10,39,11,heat>70?'#ff785f':'#e7e2ca');
+ text('EVACUATED',520,20,10,'#b8c2b4');text(`${String(saved).padStart(2,'0')} / 06`,520,46,20,'#d8f16a',"'Barlow Condensed',sans-serif");text('SCORE',625,20,10,'#b8c2b4');text(String(score).padStart(6,'0'),625,46,20,'#f3e8c9',"'Barlow Condensed',sans-serif");
+ // room strip / map
+ const mx=750,my=22,mw=155;rounded(mx-9,my-10,mw+18,42,4,'#1c2829');for(let i=0;i<3;i++){rect(mx+i*51,my,48,13,i===roomIndex?'#b68c50':'#48524a');text(`0${i+1}`,mx+i*51+24,my+7,9,'#171c1b',"'DM Mono', monospace",'center');}rect(mx+(player.x/world.w)*mw-3,my+20,7,5,'#ff5849');for(const c of civilians)if(!c.rescued){rect(mx+(c.x/world.w)*mw-2,my+18,4,4,'#d9f16a');}
+ // bottom weapon panel
+ rect(0,H-59,W,59,'#111819ed');rect(0,H-60,W,1,'#92845e');text('EXTINGUISHER',18,H-38,9,'#84948d');
+ const w=weapons[weapon];rounded(122,H-51,205,42,4,'#273332');rect(122,H-51,4,42,w.color);text(w.icon,143,H-29,22,w.color,"'Arial',sans-serif");text(w.name,169,H-36,15,'#f4eed7',"'Barlow Condensed',sans-serif");text(`${w.ammo} ROUNDS`,169,H-20,9,'#a9b5a9');
+ for(let i=0;i<4;i++){rounded(340+i*34,H-42,27,25,3,i===weapon?'#d8f16a':'#26302e');text(`${i+1}`,353+i*34,H-29,11,i===weapon?'#17201d':'#9aa59b',"'DM Mono', monospace",'center');}
+ text('Q  SWITCH',493,H-29,10,'#7f9188');
+ let action=null,ad=60;for(const c of civilians)if(!c.rescued&&!c.carried&&dist(player,c)<ad){action='PICK UP CIVILIAN';ad=dist(player,c);}if(player.carry&&nearestExit(player.x,player.y))action='EVACUATE';if(!action&&pickups.some(p=>!p.used&&dist(player,p)<38))action='COLLECT SUPPLY';if(action){rounded(542,H-48,152,34,3,'#48513b');text('E',558,H-31,13,'#d8f16a');text(action,576,H-31,10,'#f4edcf');}else{text('E  INTERACT',556,H-29,10,'#7f9188');}
+ text('F  FULLSCREEN',790,H-29,9,'#7f9188');rounded(907,15,36,36,4,'#263130');text('Ⅱ',925,34,16,'#e8e4d4',"'Arial',sans-serif",'center');
+ // Joysticks show only while in use on touch
+ for(const t of touches.values()){const d=t.last, dx=d.x-t.start.x,dy=d.y-t.start.y;ctx.globalAlpha=.5;ctx.strokeStyle=t.side==='move'?'#d8f16a':'#8de6ed';ctx.lineWidth=2;ctx.beginPath();ctx.arc(t.start.x,t.start.y,42,0,7);ctx.stroke();ctx.fillStyle=t.side==='move'?'#d8f16a':'#8de6ed';ctx.beginPath();ctx.arc(t.start.x+clamp(dx,-28,28),t.start.y+clamp(dy,-28,28),14,0,7);ctx.fill();ctx.globalAlpha=1;}
+ if(noticeTime>0){rounded(W/2-210,91,420,32,4,'#131a1be8');text(notice,W/2,107,11,'#f1dfab',"'DM Mono', monospace",'center');}
+ if(roomIndex===0&&saved===0&&elapsed<14){text('RESCUE CIVILIANS  •  EXTINGUISH MATCHING FIRE TYPES  •  EXIT VIA A WINDOW',W/2,97,9,'#c8d2ba',"'DM Mono', monospace",'center');}
+}
+function drawOverlay(){if(state==='playing')return;rect(0,0,W,H,'#0a1112aa');if(state==='title'){
+ // warm fire-lit title card with pixel mascot
+ rect(68,62,824,415,'#182223');rect(68,62,824,5,'#ca4839');rect(68,472,824,5,'#bca265');
+ text('A CITY ON FIRE. SIX PEOPLE LEFT INSIDE.',112,114,11,'#ed7955');text('MR. RESCUE',108,179,64,'#f1e7c9',"'Barlow Condensed',sans-serif");text('EXTINGUISH',112,230,30,'#d8f16a',"'Barlow Condensed',sans-serif");text('PROTOCOL',112,262,30,'#d8f16a',"'Barlow Condensed',sans-serif");
+ text('A TOP-DOWN FIREFIGHTER RESCUE',112,307,12,'#bac3b4');text('TACTICAL ARCADE • FLOOR 01 • 3 SECTORS',112,327,10,'#7f918a');
+ // mascot / burning room diorama
+ rect(570,131,260,226,'#292d29');for(let i=0;i<6;i++)rect(580+i*42,139,1,206,'#4e4c40');for(let i=0;i<5;i++)rect(575,152+i*42,250,1,'#4c493f');
+ rect(638,216,119,63,'#7e5d43');rect(648,224,99,44,'#a57d54');rect(672,202,48,15,'#b5372f');rect(680,193,33,12,'#e4513b');rect(672,237,53,34,'#e8bd3f');rect(679,232,40,9,'#c94636');rect(678,266,10,12,'#293331');rect(709,266,10,12,'#293331');
+ for(let i=0;i<7;i++){const xx=598+i*34;rect(xx,302-(i%3)*16,5,rand(14,32),'#fa6d37');rect(xx+3,308-(i%3)*16,3,rand(9,20),'#ffd571');}
+ rect(787,151,23,26,'#7c3b32');text('FIRE',798,190,8,'#ffb64e',"'DM Mono', monospace",'center');
+ rounded(111,371,229,50,4,'#d8f16a');text('BEGIN RESPONSE',225,396,16,'#19201d',"'Barlow Condensed',sans-serif",'center');text('PRESS ENTER OR TAP',112,443,10,'#889891');
+ text('WASD MOVE    ARROWS AIM / FIRE    E RESCUE    Q SWITCH',521,396,10,'#d5d5c3');text('TOUCH: LEFT MOVE  ·  RIGHT AIM + SPRAY',521,416,10,'#84958c');text('MATCH THE AGENT TO THE THREAT. STAY COOL.',521,436,9,'#f0a578');
+ }else if(state==='paused'){text('RESPONSE PAUSED',W/2,220,38,'#f3e8c9',"'Barlow Condensed',sans-serif",'center');text('TAP OR PRESS ESCAPE TO RESUME',W/2,275,12,'#d8f16a',"'DM Mono', monospace",'center');}
+ else {const win=state==='won';text(win?'FLOOR CLEARED':'SIGNAL LOST',W/2,201,45,win?'#d8f16a':'#ff6953',"'Barlow Condensed',sans-serif",'center');text(win?'THE SURVIVORS MADE IT OUT.':'THERMAL FAILURE. THE BUILDING IS LOST.',W/2,252,13,'#f3e8c9',"'DM Mono', monospace",'center');text(`CIVILIANS ${saved} / 6     FINAL SCORE ${String(score).padStart(6,'0')}`,W/2,291,13,'#b7c3b4',"'DM Mono', monospace",'center');rounded(W/2-111,340,222,48,4,'#d8f16a');text(win?'DEPLOY AGAIN':'RETRY FLOOR',W/2,364,17,'#18201d',"'Barlow Condensed',sans-serif",'center');text('PRESS ENTER OR TAP',W/2,414,10,'#9aa79d',"'DM Mono', monospace",'center');}}
+function draw(){ctx.clearRect(0,0,W,H);if(state==='title'){rect(0,0,W,H,'#111819');drawOverlay();return;}worldDraw();if(damageFlash>0)rect(0,0,W,H,`rgba(242,65,46,${damageFlash*.16})`);drawHUD();drawOverlay();}
+function loop(ts){const dt=Math.min(.04,(ts-last)/1000||0);last=ts;update(dt);draw();requestAnimationFrame(loop);}
+makeWorld();state='title';requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
