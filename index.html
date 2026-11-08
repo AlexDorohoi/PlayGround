@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101423">
+  <meta name="description" content="Three tiny arcade games from the wonderfully weird Dripdrop studio.">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <title>Dripdrop Presents: Fomnp Cumpilation!!</title>
+  <link rel="preload" href="assets/fonts/Bungee.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="cabinet">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Dripdrop home"><span class="brand-mark">d</span><span>DRIPDROP<span class="brand-dot">®</span></span></a>
+      <div class="edition"><span class="live-dot"></span> THE TOTALLY REAL ARCADE <span class="edition-sep">/</span> VOL. 01</div>
+      <button class="sound-toggle" id="soundToggle" aria-label="Toggle sound" title="Toggle sound">♫ <span>SOUND ON</span></button>
+    </header>
+    <section class="game-wrap" aria-label="Fomnp Cumpilation arcade game">
+      <canvas id="game" width="960" height="600" aria-label="Game screen"></canvas>
+      <div class="sr-only" id="announcement" aria-live="polite"></div>
+    </section>
+    <div class="touch-controls" id="touchControls" aria-label="Touch controls">
+      <div class="control-group"><button data-control="left" aria-label="Move left">←</button><button data-control="right" aria-label="Move right">→</button></div>
+      <button class="jump-control" data-control="jump" aria-label="Jump">JUMP <span>↟</span></button>
+      <div class="touch-tip">DRAG TO MOVE <span>·</span> TAP TO POP</div>
+    </div>
+    <footer class="footer"><span>AN UNNECESSARILY IMPORTANT COLLECTION OF LITTLE GAMES</span><span class="footer-right">NO ADS. JUST ODD LITTLE VIBES. <b>✳</b></span></footer>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
