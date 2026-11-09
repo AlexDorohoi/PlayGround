@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#101a22">
+  <title>Mr. Rescue: Extinguish Protocol</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="game" aria-label="Mr. Rescue firefighter game">
+    <canvas id="screen" width="960" height="540" aria-label="Top-down firefighter rescue game"></canvas>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">✦</span><div><b>MR. RESCUE</b><small>EXTINGUISH PROTOCOL <i>• FLOOR <span id="floor">01</span></i></small></div></div>
+      <div class="stat score"><small>SCORE</small><b id="score">0000</b></div>
+      <div class="stat rescued"><small>RESCUED</small><b><span id="rescued">0</span><em> / </em><span id="total">4</span></b></div>
+      <div class="stat grade"><small>STYLE GRADE</small><b id="grade">C</b></div>
+      <button id="pause" class="icon-button" aria-label="Pause game">Ⅱ</button>
+    </header>
+    <div class="heat-panel"><span class="heat-icon">♨</span><div class="heat-copy"><b>HEAT</b><small id="heatLabel">NOMINAL</small></div><div class="heat-track"><i id="heatFill"></i></div></div>
+    <div class="health-panel"><span class="health-icon">✚</span><div class="health-copy"><b>CREW</b><small id="healthLabel">100%</small></div><div class="health-track"><i id="healthFill"></i></div></div>
+    <div class="objective"><span class="objective-dot"></span><span id="objectiveText">FIND THE SURVIVORS · 4 SIGNALS</span></div>
+    <div id="toast" class="toast" aria-live="polite"></div>
+    <div class="carry-tag" id="carryTag">CIVILIAN SECURED</div>
+
+    <div class="controls" id="controls">
+      <div class="stick-zone move-zone" id="moveZone" aria-label="Movement joystick"><div class="stick-base"><div class="stick-knob"></div></div><span class="stick-caption">MOVE</span></div>
+      <div class="bottom-controls">
+        <button id="toolButton" class="tool-button" aria-label="Switch extinguisher"><span class="tool-icon">◈</span><span class="tool-label"><small>EXTINGUISHER</small><b id="toolName">WATER</b></span><span class="tool-swap">↻</span></button>
+        <div class="tool-status"><span class="status-light"></span><b id="toolStatus">READY</b><small id="cooldownLabel">HOLD TO SPRAY</small></div>
+        <button id="actionButton" class="action-button"><span>✚</span><b id="actionLabel">RESCUE</b></button>
+      </div>
+      <div class="stick-zone aim-zone" id="aimZone" aria-label="Aim and spray joystick"><div class="stick-base"><div class="stick-knob"></div><span class="aim-glyph">✦</span></div><span class="stick-caption">AIM + SPRAY</span></div>
+    </div>
+    <div id="endCard" class="end-card" hidden><div class="end-inner"><div class="end-icon" id="endIcon">✦</div><small id="endEyebrow">FLOOR COMPLETE</small><h1 id="endTitle">ALL CLEAR!</h1><p id="endText">The crew made it out.</p><div class="end-stats"><span>RESCUED <b id="endRescued">0 / 4</b></span><span>STYLE <b id="endGrade">A</b></span></div><button id="continueButton">NEXT FLOOR <span>→</span></button></div></div>
+    <div class="orientation-hint" aria-hidden="true">↻ BEST PLAYED LANDSCAPE</div>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
